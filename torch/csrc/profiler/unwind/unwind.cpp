@@ -74,8 +74,8 @@ std::vector<Frame> symbolize(const std::vector<void*>& frames, Mode mode) {
   char symbol_buf[sizeof(SYMBOL_INFO) + MAX_SYM_NAME] = {0};
   for (void* frame_addr : frames) {
     Frame detail;
-    detail.filename = "(unknown file)";
-    detail.funcname = "(unknown function)";
+    detail.filename = "??";
+    detail.funcname = "??";
     detail.lineno = 0;
     if (!frame_addr) {
       frame_details.push_back(detail);

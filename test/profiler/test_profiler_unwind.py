@@ -61,13 +61,14 @@ class TestUnwindFunctionality(TestCase):
     @staticmethod
     def check_cpp_stacktrace(traceback_str: str) -> Tuple[bool, List]:
         """Verify presence of C++ stack frames in traceback"""
-        # Key indicators of C++ stack unwinding on Windows
+        # Key indicators of C++ stack unwinding on Windows/linux
+        torch_file_path = "/aten/src/ATen/native/" if IS_LINUX else "\\aten\\src\\ATen\\native\\"
         cpp_stack_keywords = [
             "c10::detail::torchCheckFail",
             "at::native::matmul",
-            "libtorch_cpu",
-            "frame #",
-            "/aten/src/ATen/native/"
+            "at::_ops::mm::call",
+            "#",
+            torch_file_path
         ]
         
         matched_keywords = []
