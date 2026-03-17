@@ -28,6 +28,7 @@ std::vector<void*> unwind() {
   frames.resize(real);
   return frames;
 }
+
 std::optional<std::pair<std::string, uint64_t>> libraryFor(void* addr) {
   constexpr int MAX_NAME_LEN = 256;
   HMODULE h_module = nullptr;
@@ -46,6 +47,7 @@ std::optional<std::pair<std::string, uint64_t>> libraryFor(void* addr) {
   if (fname_length == 0) {
     return std::nullopt;
   }
+
   wchar_t* last_slash_pos = wcsrchr(module_full_path, L'\\');
   std::wstring module_base_name_w;
   if (last_slash_pos) {
@@ -55,12 +57,15 @@ std::optional<std::pair<std::string, uint64_t>> libraryFor(void* addr) {
   }
   std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
   std::string module_base_name = conv.to_bytes(module_base_name_w);
+
   uint64_t module_base_addr = reinterpret_cast<uint64_t>(h_module);
   uint64_t addr_64 = reinterpret_cast<uint64_t>(addr);
   uint64_t offset = addr_64 - module_base_addr;
+
   return std::make_optional(
       std::make_pair(std::move(module_base_name), offset));
 }
+
 std::vector<Frame> symbolize(const std::vector<void*>& frames, Mode mode) {
   HANDLE hProcess = GetCurrentProcess();
   DWORD flags = SymGetOptions();
@@ -69,18 +74,21 @@ std::vector<Frame> symbolize(const std::vector<void*>& frames, Mode mode) {
   if (!inited) {
     return {};
   }
+
   std::vector<Frame> frame_details;
   frame_details.reserve(frames.size());
   char symbol_buf[sizeof(SYMBOL_INFO) + MAX_SYM_NAME] = {0};
+
   for (void* frame_addr : frames) {
     Frame detail;
     detail.filename = "??";
     detail.funcname = "??";
     detail.lineno = 0;
     if (!frame_addr) {
-      frame_details.push_back(detail);
+      frame_details.push_back(std::move(detail));
       continue;
     }
+
     DWORD64 addr = reinterpret_cast<DWORD64>(frame_addr);
     PSYMBOL_INFO pSymbol = reinterpret_cast<PSYMBOL_INFO>(symbol_buf);
     pSymbol->SizeOfStruct = sizeof(SYMBOL_INFO);
@@ -89,6 +97,7 @@ std::vector<Frame> symbolize(const std::vector<void*>& frames, Mode mode) {
     if (SymFromAddr(hProcess, addr, &disp, pSymbol)) {
       detail.funcname = pSymbol->Name;
     }
+
     IMAGEHLP_LINE64 line_info = {0};
     line_info.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
     DWORD line_disp = 0;
@@ -96,16 +105,20 @@ std::vector<Frame> symbolize(const std::vector<void*>& frames, Mode mode) {
       detail.filename = line_info.FileName;
       detail.lineno = static_cast<uint64_t>(line_info.LineNumber);
     }
+
     frame_details.push_back(std::move(detail));
   }
+
   SymCleanup(hProcess);
   return frame_details;
 }
+
 Stats stats() {
   TORCH_WARN_ONCE(
       "record_context_cpp is not support on non-linux non-x86_64 platforms");
   return {};
 }
+
 } // namespace torch::unwind
 #else
 namespace torch::unwind {
@@ -114,11 +127,13 @@ std::vector<void*> unwind() {
       "record_context_cpp is not support on non-linux non-x86_64 platforms");
   return {};
 }
+
 std::optional<std::pair<std::string, uint64_t>> libraryFor(void* addr) {
   TORCH_WARN_ONCE(
       "record_context_cpp is not support on non-linux non-x86_64 platforms");
   return {};
 }
+
 #ifndef FBCODE_CAFFE2
 std::vector<Frame> symbolize(const std::vector<void*>& frames, Mode mode) {
   TORCH_WARN_ONCE(
@@ -126,11 +141,13 @@ std::vector<Frame> symbolize(const std::vector<void*>& frames, Mode mode) {
   return {};
 }
 #endif
+
 Stats stats() {
   TORCH_WARN_ONCE(
       "record_context_cpp is not support on non-linux non-x86_64 platforms");
   return {};
 }
+
 } // namespace torch::unwind
 #endif
     
