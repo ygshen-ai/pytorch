@@ -14828,6 +14828,27 @@ def forward(self, L_x_ : torch.Tensor):
         self.assertEqual(ref, result)
         self.assertEqual(saved_ref, saved["grad"])
 
+    def test_import_user_defined_module(self):
+        """
+        testcase for https://github.com/pytorch/pytorch/issues/177682
+        Bad import result for types.ModuleType subclass in sys.modules
+        """
+        class _ConfigModule(types.ModuleType):
+            x = 1
+
+        _ConfigModule.__module__ = __name__
+        sys.modules["my_config"] = _ConfigModule("my_config")
+
+        @torch.compile(fullgraph=True, backend="eager")
+        def f():
+            import my_config  # noqa: F401
+            return torch.tensor(1)
+        try:
+            f()
+        except Exception:
+            self.assertTrue(False, msg="compile error should not be raised")
+        else:
+            self.assertTrue(True)
 
 class MiscTestsPyTree(torch._inductor.test_case.TestCase):
     @parametrize_pytree_module
