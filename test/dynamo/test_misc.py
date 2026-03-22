@@ -14848,6 +14848,7 @@ def forward(self, L_x_ : torch.Tensor):
         ret2 = compilefn()
         self.assertEqual(ret1, ret2)
 
+
 class MiscTestsPyTree(torch._inductor.test_case.TestCase):
     @parametrize_pytree_module
     def test_tracing_pytree(self, pytree):
