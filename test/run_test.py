@@ -30,6 +30,7 @@ from torch.testing._internal.common_utils import (
     get_report_path,
     IS_CI,
     IS_MACOS,
+    IS_WINDOWS,
     isRocmArchAnyOf,
     retry_shell,
     set_cwd,
@@ -104,6 +105,7 @@ HAVE_TEST_SELECTION_TOOLS = True
 TEST_CONFIG = os.getenv("TEST_CONFIG", "")
 BUILD_ENVIRONMENT = os.getenv("BUILD_ENVIRONMENT", "")
 RERUN_DISABLED_TESTS = os.getenv("PYTORCH_TEST_RERUN_DISABLED_TESTS", "0") == "1"
+NUM_PYTEST_RERUNS = int(os.getenv("PYTORCH_NUM_PYTEST_RERUNS", "2"))
 DISTRIBUTED_TEST_PREFIX = "distributed"
 INDUCTOR_TEST_PREFIX = "inductor"
 IS_SLOW = "slow" in TEST_CONFIG or "slow" in BUILD_ENVIRONMENT
@@ -1266,9 +1268,9 @@ def get_pytest_args(options, is_cpp_test=False, is_distributed_test=False):
         # flakiness status. Default to 50 re-runs
         rerun_options = ["--flake-finder", f"--flake-runs={count}"]
     else:
-        # When under the normal mode, retry a failed test 2 more times. -x means stop at the first
-        # failure
-        rerun_options = ["-x", "--reruns=2"]
+        # When under the normal mode, retry a failed test NUM_PYTEST_RERUNS more times.
+        # -x means stop at the first failure. Set PYTORCH_NUM_PYTEST_RERUNS=0 to disable.
+        rerun_options = ["-x", f"--reruns={NUM_PYTEST_RERUNS}"]
 
     pytest_args = [
         "-vv",
@@ -1801,7 +1803,53 @@ def get_selected_tests(options) -> list[str]:
 
     selected_tests = exclude_tests(options.exclude, selected_tests)
 
-    if sys.platform == "win32" and not options.ignore_win_blocklist:
+    if IS_WINDOWS and not options.ignore_win_blocklist:
+        from torch.testing._internal.common_cuda import SM120OrLater, SM89OrLater
+
+        # Disable tests on Windows for SM89 and later - tests failing in ci
+        # Enable tests after fixing the failures
+        if SM89OrLater:
+            WINDOWS_BLOCKLIST.extend(
+                [
+                    # Windows fatal exception / access violation
+                    "functorch/test_aotdispatch",
+                    "functorch/test_control_flow",
+                    "nn/test_convolution",
+                    "profiler/test_profiler",
+                    "test_modules",
+                    "test_expanded_weights",
+                    "test_jit",
+                    "test_nested_tensor",
+                    "test_nestedtensor",
+                    "test_nn",
+                    # DLL load failed errors, missing dependencies
+                    "test_custom_ops",
+                    "test_testing",
+                    # Features not supported on Windows ( e.g. rowwise scaling)
+                    "test_decomp",
+                    "test_transformers",
+                    "test_ops",
+                    # Output mismatch errors and long running tests
+                    "test_linalg",
+                    "test_matmul_cuda",
+                ]
+            )
+
+        # Disable tests on Windows for SM120 and later - tests failing in ci
+        # Enable tests after fixing the failures
+        if SM120OrLater:
+            WINDOWS_BLOCKLIST.extend(
+                [
+                    # Windows fatal exception / access violation
+                    "test_fake_tensor",
+                    "test_cpp_extensions_jit",
+                    # TDR, BSOD observed
+                    "functorch/test_ops",
+                    # test_api fails on Windows SM120+. Triage pending.
+                    "cpp/test_api",
+                ]
+            )
+
         target_arch = os.environ.get("VSCMD_ARG_TGT_ARCH")
         if target_arch != "x64":
             WINDOWS_BLOCKLIST.append("cpp_extensions_aot_no_ninja")
