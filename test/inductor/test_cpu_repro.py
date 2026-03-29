@@ -2173,7 +2173,7 @@ class CPUReproTests(TestCase):
                 ret = test_division(x, y, rounding_mode=rounding_mode)
                 self.fail('division by zero expected, should not run to here')
             except Exception as e:
-                detected = 'division by zero' in str(e)
+                detected = 'ZeroDivisionError' in str(e)
                 self.assertTrue(detected)
 
         x1 = torch.randn(3, 4)
